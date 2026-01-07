@@ -1,0 +1,5 @@
+{
+  "name": "GeoFlow Studio - GIS Automation Architect",
+  "description": "A high-performance desktop-style interface for orchestrating GIS Python scripts, managing interpreters, and monitoring automation workflows with a real-time console.",
+  "requestFramePermissions": []
+}
