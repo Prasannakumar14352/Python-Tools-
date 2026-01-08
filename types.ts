@@ -41,8 +41,9 @@ export interface AppConfig {
   verboseLogging: boolean;
   dryRun: boolean;
   theme: 'light' | 'dark';
-  // New SDE to GDB Fields
   sdeToGdbSource: string;
   sdeToGdbTargetFolder: string;
   sdeToGdbName: string;
+  // Dynamic script storage
+  scripts: Record<string, string>;
 }

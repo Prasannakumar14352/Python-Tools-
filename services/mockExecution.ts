@@ -10,57 +10,42 @@ export async function simulateScriptRun(
   onProgress: (progress: number) => void
 ): Promise<boolean> {
   const timestamp = () => new Date().toLocaleTimeString();
+  const currentScript = config.scripts[script.id] || "No content";
 
-  onLog({ timestamp: timestamp(), level: 'SYSTEM', message: `Preparing: ${script.name}` });
-  onLog({ timestamp: timestamp(), level: 'INFO', message: `Starting: ${script.scriptPath || 'Internal Module'}` });
+  onLog({ timestamp: timestamp(), level: 'SYSTEM', message: `Initializing Architecture for: ${script.name}` });
+  onLog({ timestamp: timestamp(), level: 'INFO', message: `Loading local Python Environment: ${config.interpreterPath || 'arcgispro-py3'}` });
   
   onProgress(10);
   await delay(400);
 
-  if (config.dryRun) {
-    onProgress(50);
-    await delay(300);
-    onLog({ timestamp: timestamp(), level: 'WARNING', message: `TEST RUN: Command would be: "${config.interpreterPath}" "${script.scriptPath || script.id}.py"` });
-    onProgress(100);
-    return true;
-  }
-
-  // Validation
-  onProgress(25);
-  await delay(600);
-  onLog({ timestamp: timestamp(), level: 'INFO', message: `Checking file accessibility...` });
+  onLog({ timestamp: timestamp(), level: 'INFO', message: `Sending Script Context to Backend...` });
   
-  if (!config.sourceGdb && script.id !== 'sde-to-gdb') {
-    onLog({ timestamp: timestamp(), level: 'ERROR', message: `Error: Source Geodatabase path is empty.` });
-    onProgress(0);
-    return false;
-  }
-
-  // Processing
-  onProgress(45);
+  // Simulation of running the ACTUAL code
+  onProgress(30);
   await delay(800);
-  onLog({ timestamp: timestamp(), level: 'INFO', message: `Reading spatial data...` });
   
-  onProgress(70);
-  await delay(1000);
-  onLog({ timestamp: timestamp(), level: 'INFO', message: `Applying transformations...` });
-  
-  if (config.verboseLogging) {
-    onLog({ timestamp: timestamp(), level: 'INFO', message: `[Detail] Processing layer: "Main_Infrastructure"` });
-    onLog({ timestamp: timestamp(), level: 'INFO', message: `[Detail] Memory Usage: 320 MB` });
+  const scriptPreview = currentScript.substring(0, 50).replace(/\n/g, ' ') + "...";
+  onLog({ timestamp: timestamp(), level: 'INFO', message: `Executing Python block: [${scriptPreview}]` });
+
+  if (script.id === 'sde-to-gdb') {
+    onLog({ timestamp: timestamp(), level: 'INFO', message: `Connecting to SDE Workspace: ${config.sdeToGdbSource}` });
+    await delay(1000);
+    onLog({ timestamp: timestamp(), level: 'INFO', message: `Creating Output GDB at ${config.sdeToGdbTargetFolder}` });
+    onProgress(60);
+    await delay(800);
+    onLog({ timestamp: timestamp(), level: 'SUCCESS', message: `Schema migration successful.` });
   }
 
-  // Completion
-  onProgress(90);
-  await delay(700);
-  
-  if (Math.random() < 0.05) {
-    onLog({ timestamp: timestamp(), level: 'ERROR', message: `Fatal: Unexpected error during file write operation.` });
+  onProgress(85);
+  await delay(1200);
+
+  if (Math.random() < 0.02) {
+    onLog({ timestamp: timestamp(), level: 'ERROR', message: `RuntimeError: arcpy failed to find specified workspace.` });
     onProgress(0);
     return false;
   }
 
-  onLog({ timestamp: timestamp(), level: 'SUCCESS', message: `Done: ${script.name} completed successfully.` });
+  onLog({ timestamp: timestamp(), level: 'SUCCESS', message: `✅ Script execution finished successfully.` });
   onProgress(100);
   return true;
 }

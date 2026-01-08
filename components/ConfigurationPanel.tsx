@@ -23,7 +23,9 @@ import {
   Loader2,
   AlertCircle,
   FileOutput,
-  Type
+  Type,
+  Settings2,
+  History
 } from 'lucide-react';
 
 interface FeatureClass {
@@ -41,7 +43,6 @@ interface ConfigurationPanelProps {
 }
 
 const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, config, onChange, isExecuting, onExecute }) => {
-  const [urlError, setUrlError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [featureClasses, setFeatureClasses] = useState<FeatureClass[]>([]);
@@ -54,7 +55,6 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  // Scan Logic
   const getRelevantPath = () => {
     if (activeView === 'gdb-extract') return config.sourceGdb;
     if (activeView === 'sde-to-gdb') return config.sdeToGdbSource;
@@ -70,55 +70,32 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
     );
     
     if (isGisPath && (activeView === 'gdb-extract' || activeView === 'sde-to-gdb')) {
-      scanGdb(path);
+      scanWorkspace(path);
     } else {
       setFeatureClasses([]);
     }
   }, [config.sourceGdb, config.sdeToGdbSource, activeView]);
 
-  const scanGdb = async (path: string) => {
+  const scanWorkspace = async (path: string) => {
     if (!config.backendVerified) {
-      setScanError("Python backend not verified. Please check Settings.");
+      setScanError("Python backend not verified.");
       return;
     }
-
     setIsScanning(true);
     setScanError(null);
-    
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Act as a Python backend with Arcpy installed. 
-        The user has selected a workspace at: "${path}".
-        Analyze the path and return a JSON list of feature classes, tables, and datasets that would likely be in this database.
-        Include metadata like rows (formatted string) and geometry type.
-        Return ONLY a JSON array of objects with keys: "name", "rows", and "type".`,
-        config: {
-          responseMimeType: "application/json"
-        }
+        contents: `Act as a Python backend with Arcpy installed. Workspace: "${path}". Return a JSON array of feature classes with keys: "name", "rows", and "type".`,
+        config: { responseMimeType: "application/json" }
       });
-
       const data = JSON.parse(response.text || "[]");
       setFeatureClasses(data.length > 0 ? data : FEATURE_CLASSES_MOCK);
     } catch (err) {
-      console.error("Workspace Scan failed:", err);
-      setScanError("Failed to connect to Arcpy engine. Verify local Python installation.");
+      setScanError("Failed to scan workspace metadata.");
       setFeatureClasses([]);
     } finally {
       setIsScanning(false);
-    }
-  };
-
-  const validateUrl = (url: string) => {
-    if (!url) {
-      setUrlError(null);
-      return;
-    }
-    try {
-      new URL(url);
-      setUrlError(null);
-    } catch (e) {
-      setUrlError('Please enter a valid URL (e.g. https://www.arcgis.com)');
     }
   };
 
@@ -134,378 +111,168 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
     }
   };
 
-  const InputField = ({ label, value, sub, placeholder, icon: Icon, onChange: onValChange, error, isFile = true, onFileClick }: any) => (
-    <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
+  const InputField = ({ label, value, sub, placeholder, icon: Icon, onChange: onValChange, isFile = true, onFileClick }: any) => (
+    <div className="space-y-2 animate-in fade-in duration-300">
       <div className="flex items-center gap-2">
-        <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">{label}</label>
-        <Info size={12} className="text-slate-300 dark:text-slate-600 cursor-help" />
+        <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">{label}</label>
       </div>
-      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{sub}</p>
-      <div className="flex flex-col gap-1.5">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-600">
-              <Icon size={14} strokeWidth={2} />
-            </span>
-            <input
-              disabled={isExecuting}
-              type="text"
-              value={value}
-              onChange={(e) => {
-                onValChange(e.target.value);
-                if (label.toLowerCase().includes('url')) validateUrl(e.target.value);
-              }}
-              className={`w-full bg-slate-50 dark:bg-slate-800/50 border ${error ? 'border-red-300 dark:border-red-900 focus:ring-red-200' : 'border-slate-200 dark:border-slate-700 focus:ring-accent-dark/20 focus:border-accent-dark'} rounded-lg pl-9 pr-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 font-mono focus:outline-none focus:ring-2 transition-all shadow-inner`}
-              placeholder={placeholder}
-            />
-          </div>
-          {isFile && (
-            <button 
-              onClick={onFileClick}
-              className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 px-3.5 rounded-lg text-slate-500 dark:text-slate-400 transition-all shadow-sm active:scale-[0.97] hover:border-accent-dark/50 group"
-              title="Browse system"
-            >
-              <Search size={16} className="group-hover:text-accent-dark transition-colors" />
-            </button>
-          )}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <Icon size={14} />
+          </span>
+          <input
+            disabled={isExecuting}
+            type="text"
+            value={value}
+            onChange={(e) => onValChange(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-600 dark:text-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-accent-dark/20 transition-all shadow-inner"
+            placeholder={placeholder}
+          />
         </div>
-        {error && <span className="text-[9px] text-red-500 font-bold px-1">{error}</span>}
+        {isFile && (
+          <button onClick={onFileClick} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 rounded-lg text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+            <Search size={14} />
+          </button>
+        )}
       </div>
     </div>
   );
 
-  const renderContent = () => {
+  const renderConfig = () => {
     switch (activeView) {
       case 'sde-to-gdb':
-        const isSdeSelected = config.sdeToGdbSource && (config.sdeToGdbSource.toLowerCase().endsWith('.sde') || config.sdeToGdbSource.toLowerCase().endsWith('.gdb'));
         return (
-          <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4">
+          <div className="space-y-6">
             <InputField 
-              label="Source Workspace"
-              sub="Path to the source .sde connection or .gdb folder"
+              label="Source SDE Workspace"
+              sub="Connection file or path"
               value={config.sdeToGdbSource}
               icon={Database}
               placeholder="C:\GIS\Data\source.sde"
               onChange={(v: string) => onChange({ sdeToGdbSource: v })}
               onFileClick={() => openBrowser('sdeToGdbSource', 'file', 'Select Source Workspace')}
             />
-
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 min-h-[180px] relative">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
-                  <RefreshCw size={14} className="text-accent-dark" /> Source Content Preview
-                  {isSdeSelected && !isScanning && <CheckCircle2 size={12} className="text-emerald-500" />}
-                </h4>
-              </div>
-              
-              {isScanning && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 dark:bg-slate-900/60 z-10 rounded-2xl">
-                  <Loader2 size={24} className="text-accent-dark animate-spin mb-2" />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">Scanning SDE...</span>
-                </div>
-              )}
-
-              {isSdeSelected ? (
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                  {featureClasses.map((fc, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 border border-slate-50 dark:border-slate-800 rounded-lg bg-slate-50/30">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">{fc.name}</span>
-                        <span className="text-[8px] text-slate-400 font-medium uppercase">{fc.type}</span>
-                      </div>
-                      <span className="text-[9px] text-slate-400 font-mono">{fc.rows} rows</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 opacity-40">
-                  <Database size={24} className="mb-2" />
-                  <span className="text-[10px] uppercase font-bold tracking-widest">Select Source to Preview Content</span>
-                </div>
-              )}
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InputField 
                 label="Target Folder"
-                sub="Where the GDB will be created"
                 value={config.sdeToGdbTargetFolder}
                 icon={FolderOpen}
-                placeholder="C:\GIS\Output"
                 onChange={(v: string) => onChange({ sdeToGdbTargetFolder: v })}
                 onFileClick={() => openBrowser('sdeToGdbTargetFolder', 'folder', 'Select Target Folder')}
               />
               <InputField 
                 label="Output GDB Name"
-                sub="Include .gdb extension"
                 value={config.sdeToGdbName}
                 icon={Type}
                 isFile={false}
-                placeholder="OutputData.gdb"
                 onChange={(v: string) => onChange({ sdeToGdbName: v })}
               />
             </div>
-          </div>
-        );
-
-      case 'gdb-extract':
-        const isGdbSelected = config.sourceGdb && (config.sourceGdb.toLowerCase().endsWith('.gdb') || config.sourceGdb.toLowerCase().endsWith('.gdb\\'));
-        return (
-          <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4">
-            <InputField 
-              label="Source Geodatabase"
-              sub="Path to the source File Geodatabase (.gdb)"
-              value={config.sourceGdb}
-              icon={Database}
-              placeholder="C:\Data\MyDatabase.gdb"
-              onChange={(v: string) => onChange({ sourceGdb: v })}
-              onFileClick={() => openBrowser('sourceGdb', 'gdb', 'Select Source Geodatabase')}
-            />
             
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 min-h-[200px] relative">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
-                  <Database size={14} className="text-accent-dark" /> Feature Classes 
-                  {isGdbSelected && !isScanning && featureClasses.length > 0 && <CheckCircle2 size={12} className="text-emerald-500" />}
-                </h4>
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 relative min-h-[120px]">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-3 flex items-center gap-2">
+                <Database size={12} /> Detected Workspace Content
+                {isScanning && <Loader2 size={10} className="animate-spin text-accent-dark" />}
+              </span>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar">
+                {featureClasses.map((fc, i) => (
+                  <div key={i} className="flex justify-between items-center text-[10px] text-slate-600 dark:text-slate-400 p-2 bg-white dark:bg-slate-900 rounded border border-slate-100 dark:border-slate-800">
+                    <span className="font-bold">{fc.name}</span>
+                    <span className="text-[9px] opacity-60">{fc.rows} rows • {fc.type}</span>
+                  </div>
+                ))}
+                {!isScanning && featureClasses.length === 0 && (
+                  <div className="text-center py-4 text-slate-400 text-[10px] italic">No workspace selected or connected</div>
+                )}
               </div>
-
-              {isScanning ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 dark:bg-slate-900/60 backdrop-blur-[2px] z-10 rounded-2xl animate-in fade-in duration-300">
-                  <Loader2 size={32} className="text-accent-dark animate-spin mb-3" />
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Python/ArcPy Scanning...</span>
-                </div>
-              ) : null}
-
-              {scanError ? (
-                <div className="border-2 border-red-50 dark:border-red-900/20 bg-red-50/20 rounded-2xl py-12 px-6 flex flex-col items-center justify-center text-center space-y-3">
-                  <AlertCircle size={32} className="text-red-400" />
-                  <span className="text-red-600 dark:text-red-400 text-[11px] font-bold uppercase tracking-widest block">Scan Interrupted</span>
-                </div>
-              ) : isGdbSelected ? (
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar animate-in fade-in duration-500">
-                  {featureClasses.map((fc, i) => (
-                    <div key={i} className="group flex items-center justify-between p-3 border border-slate-50 dark:border-slate-800 rounded-xl bg-slate-50/30 dark:bg-slate-800/30 hover:bg-accent-light/10 transition-all cursor-pointer">
-                      <div className="flex items-center gap-3">
-                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-accent-dark focus:ring-accent-dark/20" defaultChecked />
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{fc.name}</span>
-                          <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">{fc.type}</span>
-                        </div>
-                      </div>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono font-bold">{fc.rows} rows</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl py-12 px-6 flex flex-col items-center justify-center bg-slate-50/20 dark:bg-slate-800/10 text-center space-y-3">
-                  <Database size={32} strokeWidth={1} className="text-slate-200 dark:text-slate-700" />
-                  <span className="text-slate-400 dark:text-slate-600 text-[11px] font-bold uppercase tracking-widest block">Select a geodatabase to view contents</span>
-                </div>
-              )}
             </div>
-
-            <InputField 
-              label="Output Folder"
-              sub="Destination folder for extracted files"
-              value={config.outputFolder}
-              icon={FolderOpen}
-              placeholder="C:\output\Shapefiles"
-              onChange={(v: string) => onChange({ outputFolder: v })}
-              onFileClick={() => openBrowser('outputFolder', 'folder', 'Select Output Folder')}
-            />
           </div>
         );
-
+      case 'gdb-extract':
+        return (
+          <div className="space-y-6">
+            <InputField label="Source Geodatabase" value={config.sourceGdb} icon={Database} onChange={(v: string) => onChange({ sourceGdb: v })} onFileClick={() => openBrowser('sourceGdb', 'gdb', 'Select Source Geodatabase')} />
+            <InputField label="Output Folder" value={config.outputFolder} icon={FolderOpen} onChange={(v: string) => onChange({ outputFolder: v })} onFileClick={() => openBrowser('outputFolder', 'folder', 'Select Output Folder')} />
+          </div>
+        );
       case 'sde-to-sde':
         return (
-          <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4">
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-8">
-              <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
-                <RefreshCw size={14} className="text-accent-dark" /> Enterprise Connection (.sde)
-              </h4>
-              <InputField 
-                label="Source SDE Connection"
-                sub="Select the .sde connection file for source access"
-                value={config.sdeConnection}
-                icon={FileCode}
-                placeholder="C:\Users\User\AppData\Roaming\Esri\ArcGISPro\DBConnections\Source.sde"
-                onChange={(v: string) => onChange({ sdeConnection: v })}
-                onFileClick={() => openBrowser('sdeConnection', 'file', 'Select Source SDE Connection File')}
-              />
-              <div className="flex justify-center py-2">
-                <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-full text-slate-300 dark:text-slate-600">
-                  <ArrowRight size={18} />
-                </div>
-              </div>
-              <InputField 
-                label="Target SDE Connection"
-                sub="Select the .sde connection file for destination access"
-                value={config.targetSdeConnection}
-                icon={FileCode}
-                placeholder="C:\Users\User\AppData\Roaming\Esri\ArcGISPro\DBConnections\Target.sde"
-                onChange={(v: string) => onChange({ targetSdeConnection: v })}
-                onFileClick={() => openBrowser('targetSdeConnection', 'file', 'Select Target SDE Connection File')}
-              />
-            </div>
+          <div className="space-y-6">
+            <InputField label="Source SDE" value={config.sdeConnection} icon={FileCode} onChange={(v: string) => onChange({ sdeConnection: v })} onFileClick={() => openBrowser('sdeConnection', 'file', 'Select Source SDE')} />
+            <div className="flex justify-center"><ArrowRight size={16} className="text-slate-300" /></div>
+            <InputField label="Target SDE" value={config.targetSdeConnection} icon={FileCode} onChange={(v: string) => onChange({ targetSdeConnection: v })} onFileClick={() => openBrowser('targetSdeConnection', 'file', 'Select Target SDE')} />
           </div>
         );
-
       case 'fc-comparison':
         return (
-          <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4">
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-6">
-              <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
-                <ArrowLeftRight size={14} className="text-accent-dark" /> Local Machine Data
-              </h4>
-              <InputField 
-                label="Source Dataset"
-                sub="Source feature class path"
-                value={config.sourceDataset}
-                icon={Database}
-                placeholder="C:\Data\Source.gdb\FeatureClass"
-                onChange={(v: string) => onChange({ sourceDataset: v })}
-                onFileClick={() => openBrowser('sourceDataset', 'gdb', 'Browse Source Dataset')}
-              />
-              <InputField 
-                label="Target Dataset"
-                sub="Target feature class path"
-                value={config.targetDataset}
-                icon={Database}
-                placeholder="C:\Data\Target.gdb\FeatureClass"
-                onChange={(v: string) => onChange({ targetDataset: v })}
-                onFileClick={() => openBrowser('targetDataset', 'gdb', 'Browse Target Dataset')}
-              />
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
-              <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest">Comparison Mode</h4>
-              <div className="space-y-3">
-                {[
-                  { id: 'schema', title: 'Schema Comparison', desc: 'Compare field definitions and geometry types' },
-                  { id: 'attribute', title: 'Attribute Comparison', desc: 'Identify data value discrepancies' },
-                  { id: 'spatial', title: 'Spatial Comparison', desc: 'Check topology and coordinate shifts' }
-                ].map(type => (
-                  <label key={type.id} className={`flex items-start gap-4 p-4 border rounded-2xl cursor-pointer transition-all ${config.comparisonType === type.id ? 'border-accent-dark bg-accent-light/5 dark:bg-accent-dark/5 shadow-sm ring-1 ring-accent-dark/10' : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-700'}`}>
-                    <div className="mt-0.5">
-                      <input 
-                        type="radio" 
-                        name="compType" 
-                        className="w-4 h-4 text-accent-dark border-slate-300 dark:border-slate-600 focus:ring-accent-dark/20" 
-                        checked={config.comparisonType === type.id} 
-                        onChange={() => onChange({ comparisonType: type.id as any })}
-                      />
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-bold text-slate-800 dark:text-slate-100 mb-0.5 uppercase tracking-wide">{type.title}</div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{type.desc}</div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
+          <div className="space-y-6">
+            <InputField label="Source Dataset" value={config.sourceDataset} icon={Database} onChange={(v: string) => onChange({ sourceDataset: v })} />
+            <InputField label="Target Dataset" value={config.targetDataset} icon={Database} onChange={(v: string) => onChange({ targetDataset: v })} />
           </div>
         );
-
       case 'portal-extract':
         return (
-          <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4">
-             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-8">
-               <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
-                 <Globe size={14} className="text-accent-dark" /> Portal Credentials
-               </h4>
-               <InputField 
-                  label="Portal URL"
-                  sub="ArcGIS Online or Enterprise URL"
-                  value={config.portalUrl}
-                  icon={Globe}
-                  error={urlError}
-                  isFile={false}
-                  placeholder="https://www.arcgis.com"
-                  onChange={(v: string) => onChange({ portalUrl: v })}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <InputField 
-                    label="Username"
-                    sub="Account user"
-                    value={config.portalUser}
-                    icon={User}
-                    isFile={false}
-                    placeholder="User_Name"
-                    onChange={(v: string) => onChange({ portalUser: v })}
-                  />
-                  <InputField 
-                    label="Password"
-                    sub="Account password"
-                    value={config.portalPass}
-                    icon={Lock}
-                    isFile={false}
-                    placeholder="••••••••"
-                    onChange={(v: string) => onChange({ portalPass: v })}
-                  />
-                </div>
-             </div>
-             <InputField 
-                label="Local Excel File Output"
-                sub="Destination path for the content inventory"
-                value={config.outputFolder + '\\portal_items.xls'}
-                icon={FileSpreadsheet}
-                onFileClick={() => openBrowser('portalExcel', 'folder', 'Choose Output Location')}
-                placeholder="C:\Results\portal_items.xls"
-                onChange={(v: string) => onChange({ outputFolder: v.substring(0, v.lastIndexOf('\\')) })}
-              />
+          <div className="space-y-6">
+            <InputField label="Portal URL" value={config.portalUrl} icon={Globe} onChange={(v: string) => onChange({ portalUrl: v })} isFile={false} />
+            <div className="grid grid-cols-2 gap-4">
+              <InputField label="Username" value={config.portalUser} icon={User} onChange={(v: string) => onChange({ portalUser: v })} isFile={false} />
+              <InputField label="Password" value={config.portalPass} icon={Lock} onChange={(v: string) => onChange({ portalPass: v })} isFile={false} />
+            </div>
           </div>
         );
-
+      case 'job-history':
+        return (
+          <div className="flex flex-col items-center justify-center h-full py-12 text-slate-400 space-y-4">
+            <History size={48} strokeWidth={1} className="opacity-20" />
+            <div className="text-center">
+              <p className="text-[11px] font-bold uppercase tracking-widest mb-1">Execution Archives</p>
+              <p className="text-[10px] italic">No historical jobs found on this workstation.</p>
+            </div>
+          </div>
+        );
       default:
-        return <div className="text-slate-400 italic text-sm p-12 text-center">Select a tool to continue configuration...</div>;
-    }
-  };
-
-  const getExecuteLabel = () => {
-    switch(activeView) {
-      case 'sde-to-gdb': return 'Execute Migration';
-      case 'gdb-extract': return 'Execute Extraction';
-      case 'sde-to-sde': return 'Execute Migration';
-      case 'fc-comparison': return 'Run Comparison';
-      case 'portal-extract': return 'Extract Portal Items';
-      default: return 'Execute';
+        return (
+          <div className="p-12 text-center text-slate-400 space-y-4">
+            <AlertCircle size={32} className="mx-auto opacity-20" />
+            <p className="text-xs font-bold uppercase tracking-widest">Select a valid tool from the sidebar</p>
+          </div>
+        );
     }
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-full flex flex-col relative overflow-hidden transition-colors">
-      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-8 tracking-tight">
-        {activeView === 'sde-to-gdb' ? 'Data Migration' : (activeView === 'sde-to-sde' ? 'Database Migration' : (activeView === 'fc-comparison' ? 'Quality Comparison' : 'Tool Configuration'))}
-      </h3>
-
-      {renderContent()}
-
-      <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 flex gap-4">
-        <button
-          onClick={onExecute}
-          disabled={isExecuting || !!urlError}
-          className={`flex-1 flex items-center justify-center gap-3 py-3.5 rounded-xl font-bold text-white transition-all text-xs uppercase tracking-[0.15em] shadow-lg shadow-accent/20 active:scale-[0.98] ${
-            isExecuting || !!urlError
-              ? 'bg-accent/40 cursor-not-allowed shadow-none' 
-              : 'bg-accent-dark hover:bg-[#25a99e] shadow-accent/30'
-          }`}
-        >
-          {isExecuting ? (
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-          ) : (
-            <Play size={16} fill="currentColor" />
-          )}
-          <span>{getExecuteLabel()}</span>
-        </button>
-        <button 
-          onClick={() => onChange(DEFAULT_CONFIG)}
-          className="border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition-all shadow-sm active:scale-[0.95]"
-          title="Reset"
-        >
-          <RotateCcw size={18} />
-        </button>
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-full flex flex-col relative overflow-hidden">
+      <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-8 py-6">
+        <div className="flex items-center gap-3">
+          <Settings2 size={18} className="text-accent-dark" />
+          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 tracking-tight uppercase">Tool Parameters</h3>
+        </div>
+        {activeView !== 'job-history' && (
+          <button onClick={() => onChange(DEFAULT_CONFIG)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1 transition-colors uppercase tracking-widest">
+            <RotateCcw size={12} /> Reset
+          </button>
+        )}
       </div>
+
+      <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+        {renderConfig()}
+      </div>
+
+      {activeView !== 'job-history' && (
+        <div className="p-8 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/20">
+          <button
+            onClick={onExecute}
+            disabled={isExecuting}
+            className={`w-full flex items-center justify-center gap-3 py-4 rounded-xl font-bold text-white transition-all text-xs uppercase tracking-[0.2em] shadow-lg active:scale-[0.98] ${
+              isExecuting ? 'bg-accent/40 cursor-not-allowed' : 'bg-accent-dark hover:bg-[#25a99e] shadow-accent/20'
+            }`}
+          >
+            {isExecuting ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
+            <span>{isExecuting ? 'Executing Task...' : 'Run Automation'}</span>
+          </button>
+        </div>
+      )}
 
       <FileBrowserModal 
         isOpen={browserMode.isOpen}
