@@ -16,7 +16,9 @@ import {
   FileSpreadsheet,
   Play,
   RotateCcw,
-  CheckCircle2
+  CheckCircle2,
+  FileCode,
+  Search
 } from 'lucide-react';
 
 interface ConfigurationPanelProps {
@@ -82,16 +84,17 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
                 onValChange(e.target.value);
                 if (label.toLowerCase().includes('url')) validateUrl(e.target.value);
               }}
-              className={`w-full bg-slate-50 dark:bg-slate-800/50 border ${error ? 'border-red-300 dark:border-red-900 focus:ring-red-200' : 'border-slate-200 dark:border-slate-700 focus:ring-accent-dark/20 focus:border-accent-dark'} rounded-lg pl-9 pr-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 transition-all shadow-inner`}
+              className={`w-full bg-slate-50 dark:bg-slate-800/50 border ${error ? 'border-red-300 dark:border-red-900 focus:ring-red-200' : 'border-slate-200 dark:border-slate-700 focus:ring-accent-dark/20 focus:border-accent-dark'} rounded-lg pl-9 pr-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 font-mono focus:outline-none focus:ring-2 transition-all shadow-inner`}
               placeholder={placeholder}
             />
           </div>
           {isFile && (
             <button 
               onClick={onFileClick}
-              className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 px-3.5 rounded-lg text-slate-500 dark:text-slate-400 transition-all shadow-sm active:scale-[0.97] hover:border-accent-dark/50"
+              className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 px-3.5 rounded-lg text-slate-500 dark:text-slate-400 transition-all shadow-sm active:scale-[0.97] hover:border-accent-dark/50 group"
+              title="Browse system"
             >
-              <FolderOpen size={16} />
+              <Search size={16} className="group-hover:text-accent-dark transition-colors" />
             </button>
           )}
         </div>
@@ -103,7 +106,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
   const renderContent = () => {
     switch (activeView) {
       case 'gdb-extract':
-        const isGdbSelected = config.sourceGdb && config.sourceGdb.toLowerCase().endsWith('.gdb');
+        const isGdbSelected = config.sourceGdb && (config.sourceGdb.toLowerCase().endsWith('.gdb') || config.sourceGdb.toLowerCase().endsWith('.gdb\\'));
         return (
           <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4">
             <InputField 
@@ -140,7 +143,10 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
               ) : (
                 <div className="border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl py-12 px-6 flex flex-col items-center justify-center bg-slate-50/20 dark:bg-slate-800/10 text-center space-y-3">
                   <Database size={32} strokeWidth={1} className="text-slate-200 dark:text-slate-700" />
-                  <span className="text-slate-400 dark:text-slate-600 text-[11px] font-bold uppercase tracking-widest">Select a geodatabase to view feature classes</span>
+                  <div className="space-y-1">
+                    <span className="text-slate-400 dark:text-slate-600 text-[11px] font-bold uppercase tracking-widest block">Select a geodatabase to view contents</span>
+                    <span className="text-[9px] text-slate-300 dark:text-slate-600 italic">Browsing allows picking folders as .gdb containers</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -162,16 +168,16 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
           <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-8">
               <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
-                <RefreshCw size={14} className="text-accent-dark" /> Connection Settings
+                <RefreshCw size={14} className="text-accent-dark" /> Enterprise Connection (.sde)
               </h4>
               <InputField 
                 label="Source SDE Connection"
-                sub="Connection string for source SDE"
+                sub="Select the .sde connection file for source access"
                 value={config.sdeConnection}
-                icon={RefreshCw}
-                placeholder="server:5151/database@user"
+                icon={FileCode}
+                placeholder="C:\Users\User\AppData\Roaming\Esri\ArcGISPro\DBConnections\Source.sde"
                 onChange={(v: string) => onChange({ sdeConnection: v })}
-                onFileClick={() => openBrowser('sdeConnection', 'file', 'Select SDE Connection File')}
+                onFileClick={() => openBrowser('sdeConnection', 'file', 'Select Source SDE Connection File')}
               />
               <div className="flex justify-center py-2">
                 <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-full text-slate-300 dark:text-slate-600">
@@ -180,10 +186,10 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
               </div>
               <InputField 
                 label="Target SDE Connection"
-                sub="Connection string for target SDE"
+                sub="Select the .sde connection file for destination access"
                 value={config.targetSdeConnection}
-                icon={RefreshCw}
-                placeholder="server:5151/database@user"
+                icon={FileCode}
+                placeholder="C:\Users\User\AppData\Roaming\Esri\ArcGISPro\DBConnections\Target.sde"
                 onChange={(v: string) => onChange({ targetSdeConnection: v })}
                 onFileClick={() => openBrowser('targetSdeConnection', 'file', 'Select Target SDE Connection File')}
               />
@@ -196,11 +202,11 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
           <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-6">
               <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
-                <ArrowLeftRight size={14} className="text-accent-dark" /> Data Sources
+                <ArrowLeftRight size={14} className="text-accent-dark" /> Local Machine Data
               </h4>
               <InputField 
                 label="Source Dataset"
-                sub="Source feature class or table"
+                sub="Source feature class path"
                 value={config.sourceDataset}
                 icon={Database}
                 placeholder="C:\Data\Source.gdb\FeatureClass"
@@ -209,7 +215,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
               />
               <InputField 
                 label="Target Dataset"
-                sub="Target feature class or table to compare against"
+                sub="Target feature class path"
                 value={config.targetDataset}
                 icon={Database}
                 placeholder="C:\Data\Target.gdb\FeatureClass"
@@ -222,9 +228,9 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
               <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest">Comparison Mode</h4>
               <div className="space-y-3">
                 {[
-                  { id: 'schema', title: 'Schema Comparison', desc: 'Compare field definitions, data types, and geometry types' },
-                  { id: 'attribute', title: 'Attribute Comparison', desc: 'Compare attribute values and identify differences' },
-                  { id: 'spatial', title: 'Spatial Comparison', desc: 'Compare geometry accuracy and topology' }
+                  { id: 'schema', title: 'Schema Comparison', desc: 'Compare field definitions and geometry types' },
+                  { id: 'attribute', title: 'Attribute Comparison', desc: 'Identify data value discrepancies' },
+                  { id: 'spatial', title: 'Spatial Comparison', desc: 'Check topology and coordinate shifts' }
                 ].map(type => (
                   <label key={type.id} className={`flex items-start gap-4 p-4 border rounded-2xl cursor-pointer transition-all ${config.comparisonType === type.id ? 'border-accent-dark bg-accent-light/5 dark:bg-accent-dark/5 shadow-sm ring-1 ring-accent-dark/10' : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-700'}`}>
                     <div className="mt-0.5">
@@ -286,7 +292,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
                 </div>
              </div>
              <InputField 
-                label="Output Excel File"
+                label="Local Excel File Output"
                 sub="Destination path for the content inventory"
                 value={config.outputFolder + '\\portal_items.xls'}
                 icon={FileSpreadsheet}
@@ -315,7 +321,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
   return (
     <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-full flex flex-col relative overflow-hidden transition-colors">
       <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-8 tracking-tight">
-        {activeView === 'sde-to-sde' ? 'Configuration' : (activeView === 'fc-comparison' ? 'Job Options' : 'Configuration')}
+        {activeView === 'sde-to-sde' ? 'Database Migration' : (activeView === 'fc-comparison' ? 'Quality Comparison' : 'Tool Configuration')}
       </h3>
 
       {renderContent()}
