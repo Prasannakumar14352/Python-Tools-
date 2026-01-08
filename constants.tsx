@@ -1,62 +1,11 @@
-
 import { AppConfig } from './types';
 
-export const DEFAULT_SCRIPTS: Record<string, string> = {
-  'sde-to-gdb': `import arcpy
-import os
-
-# Source workspace (SDE or GDB)
-SourcePath = r"{SourcePath}"
-
-# Target folder where GDB will be created
-TargetPath = r"{TargetPath}"
-
-# Output GDB name
-gdbName = "{GdbName}"
-
-arcpy.env.overwriteOutput = True
-arcpy.env.workspace = SourcePath
-
-out_gdb = os.path.join(TargetPath, gdbName)
-
-if not arcpy.Exists(out_gdb):
-    arcpy.CreateFileGDB_management(TargetPath, gdbName)
-    print(f"Created GDB: {out_gdb}")
-else:
-    print(f"GDB already exists: {out_gdb}")
-
-# Copy Feature Classes
-fcList = arcpy.ListFeatureClasses()
-for fc in fcList:
-    source_fc = os.path.join(SourcePath, fc)
-    target_fc = os.path.join(out_gdb, fc)
-    print(f"Copying Feature Class: {fc}")
-    arcpy.CopyFeatures_management(source_fc, target_fc)
-
-# Copy Tables
-tableList = arcpy.ListTables()
-for table in tableList:
-    print(f"Copying Table: {table}")
-    arcpy.TableToGeodatabase_conversion(os.path.join(SourcePath, table), out_gdb)
-
-# Copy Feature Datasets
-dsList = arcpy.ListDatasets(feature_type='feature')
-for dataset in dsList:
-    print(f"Processing Dataset: {dataset}")
-    source_ds = os.path.join(SourcePath, dataset)
-    target_ds = os.path.join(out_gdb, dataset)
-    if not arcpy.Exists(target_ds):
-        arcpy.CreateFeatureDataset_management(out_gdb, dataset, arcpy.Describe(source_ds).spatialReference)
-    arcpy.env.workspace = source_ds
-    fcList = arcpy.ListFeatureClasses()
-    for fc in fcList:
-        arcpy.CopyFeatures_management(os.path.join(source_ds, fc), os.path.join(target_ds, fc))
-
-print("✅ Data migration completed successfully.")`,
-  'gdb-extract': `# Extract GDB to Shapefiles\nimport arcpy\nimport os\n\nworkspace = r"{SourcePath}"\noutput = r"{TargetPath}"\n\narcpy.env.workspace = workspace\nfcs = arcpy.ListFeatureClasses()\nfor fc in fcs:\n    arcpy.FeatureClassToShapefile_conversion(fc, output)\nprint("Extraction complete.")`,
-  'sde-to-sde': `# SDE to SDE Migration\nimport arcpy\n# Migration logic here...`,
-  'fc-comparison': `# Dataset comparison logic\nimport arcpy\n# Comparison logic here...`,
-  'portal-extract': `# ArcGIS Portal Content Catalog\nfrom arcgis.gis import GIS\n# Portal logic here...`
+export const SCRIPT_FILE_PATHS: Record<string, string> = {
+  'sde-to-gdb': './scripts/sde_to_gdb.py',
+  'gdb-extract': './scripts/gdb_extract.py',
+  'sde-to-sde': './scripts/sde_to_sde.py',
+  'fc-comparison': './scripts/fc_comparison.py',
+  'portal-extract': './scripts/portal_extract.py'
 };
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -78,7 +27,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   sdeToGdbSource: 'C:\\GIS\\Data\\source.sde',
   sdeToGdbTargetFolder: 'C:\\GIS\\Output',
   sdeToGdbName: 'OutputData.gdb',
-  scripts: DEFAULT_SCRIPTS
+  scriptFilePaths: SCRIPT_FILE_PATHS
 };
 
 export const FEATURE_CLASSES_MOCK = [

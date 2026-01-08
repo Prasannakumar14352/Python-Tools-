@@ -1,4 +1,3 @@
-
 export enum ExecutionStatus {
   IDLE = 'IDLE',
   RUNNING = 'RUNNING',
@@ -44,6 +43,6 @@ export interface AppConfig {
   sdeToGdbSource: string;
   sdeToGdbTargetFolder: string;
   sdeToGdbName: string;
-  // Dynamic script storage
-  scripts: Record<string, string>;
+  // Store paths to external .py files
+  scriptFilePaths: Record<string, string>;
 }
