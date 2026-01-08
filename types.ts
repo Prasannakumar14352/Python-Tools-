@@ -27,6 +27,7 @@ export interface GISScript {
 
 export interface AppConfig {
   interpreterPath: string;
+  backendVerified: boolean;
   sourceGdb: string;
   sdeConnection: string;
   targetSdeConnection: string;

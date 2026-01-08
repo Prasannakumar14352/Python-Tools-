@@ -1,12 +1,9 @@
 
 import React, { useState } from 'react';
 import { AppConfig } from '../types';
-// Add missing import for DEFAULT_CONFIG
 import { DEFAULT_CONFIG } from '../constants';
 import { 
   Terminal, 
-  Settings as SettingsIcon, 
-  Play, 
   Trash2,
   CheckCircle2,
   XCircle,
@@ -14,7 +11,8 @@ import {
   RotateCcw,
   Sun,
   Moon,
-  Monitor
+  ShieldCheck,
+  Play
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -23,7 +21,9 @@ interface SettingsViewProps {
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ config, onChange }) => {
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>(
+    config.backendVerified ? 'success' : 'idle'
+  );
 
   const handleTestInterpreter = () => {
     setTestStatus('testing');
@@ -37,6 +37,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, onChange }) => {
     }, 1500);
   };
 
+  const handleSave = () => {
+    const isVerified = testStatus === 'success';
+    onChange({ backendVerified: isVerified });
+    alert('Configuration saved successfully! The backend status will persist on this machine.');
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-4xl">
       <div>
@@ -47,11 +53,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, onChange }) => {
       <div className="grid grid-cols-1 gap-8">
         {/* Python Environment Section */}
         <section className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
-              <Terminal size={20} />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
+                <Terminal size={20} />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">Python Environment</h3>
             </div>
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">Python Environment</h3>
+            {config.backendVerified && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-100 dark:border-emerald-800">
+                <ShieldCheck size={12} />
+                Verified & Connected
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -63,7 +77,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, onChange }) => {
                   type="text"
                   value={config.interpreterPath}
                   onChange={(e) => {
-                    onChange({ interpreterPath: e.target.value });
+                    onChange({ interpreterPath: e.target.value, backendVerified: false });
                     setTestStatus('idle');
                   }}
                   className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent-dark/20 focus:border-accent-dark transition-all"
@@ -152,7 +166,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, onChange }) => {
               <div className="text-[11px] font-bold text-red-900 dark:text-red-400 uppercase">Reset Application Data</div>
               <div className="text-[10px] text-red-700/70 dark:text-red-400/60">Clear all saved paths, credentials, and configuration history.</div>
             </div>
-            <button className="px-4 py-2 bg-red-600 text-white text-[11px] font-bold rounded-lg hover:bg-red-700 transition-all shadow-sm shadow-red-200 dark:shadow-red-950/50">
+            <button 
+              onClick={() => {
+                if(confirm("Are you sure you want to reset all data?")) {
+                  onChange(DEFAULT_CONFIG);
+                  setTestStatus('idle');
+                }
+              }}
+              className="px-4 py-2 bg-red-600 text-white text-[11px] font-bold rounded-lg hover:bg-red-700 transition-all shadow-sm shadow-red-200 dark:shadow-red-950/50"
+            >
               Reset Everything
             </button>
           </div>
@@ -166,7 +188,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ config, onChange }) => {
         >
           <RotateCcw size={14} /> Discard Changes
         </button>
-        <button className="flex items-center gap-2 px-8 py-2.5 rounded-xl bg-accent-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-[#25a99e] transition-all shadow-lg shadow-accent/20">
+        <button 
+          onClick={handleSave}
+          className="flex items-center gap-2 px-8 py-2.5 rounded-xl bg-accent-dark text-white text-xs font-bold uppercase tracking-widest hover:bg-[#25a99e] transition-all shadow-lg shadow-accent/20"
+        >
           <Save size={14} /> Save Configuration
         </button>
       </div>

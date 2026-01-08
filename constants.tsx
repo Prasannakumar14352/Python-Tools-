@@ -3,6 +3,7 @@ import { AppConfig } from './types';
 
 export const DEFAULT_CONFIG: AppConfig = {
   interpreterPath: '',
+  backendVerified: false,
   sourceGdb: 'C:\\Data\\MyDatabase.gdb',
   sdeConnection: 'server:5151/database@user',
   targetSdeConnection: 'server:5151/database@user',

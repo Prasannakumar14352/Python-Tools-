@@ -91,11 +91,19 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (activeView === 'dashboard') {
-      return <DashboardView onQuickAction={setActiveView} />;
+      return (
+        <div className="flex-1 overflow-y-auto pr-4 -mr-4 custom-scrollbar pb-8">
+          <DashboardView config={config} onQuickAction={setActiveView} />
+        </div>
+      );
     }
 
     if (activeView === 'settings') {
-      return <SettingsView config={config} onChange={(u) => setConfig(p => ({ ...p, ...u }))} />;
+      return (
+        <div className="flex-1 overflow-y-auto pr-4 -mr-4 custom-scrollbar pb-8">
+          <SettingsView config={config} onChange={(u) => setConfig(p => ({ ...p, ...u }))} />
+        </div>
+      );
     }
 
     return (
