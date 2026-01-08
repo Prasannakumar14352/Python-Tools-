@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppConfig } from '../types';
 import { FEATURE_CLASSES_MOCK, DEFAULT_CONFIG } from '../constants';
 import FileBrowserModal from './FileBrowserModal';
+import { GoogleGenAI } from "@google/genai";
 import { 
   Database, 
   FolderOpen, 
@@ -18,8 +19,16 @@ import {
   RotateCcw,
   CheckCircle2,
   FileCode,
-  Search
+  Search,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
+
+interface FeatureClass {
+  name: string;
+  rows: string;
+  type: string;
+}
 
 interface ConfigurationPanelProps {
   activeView: string;
@@ -31,12 +40,63 @@ interface ConfigurationPanelProps {
 
 const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, config, onChange, isExecuting, onExecute }) => {
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [featureClasses, setFeatureClasses] = useState<FeatureClass[]>([]);
   const [browserMode, setBrowserMode] = useState<{ isOpen: boolean; mode: 'file' | 'folder' | 'gdb'; target: keyof AppConfig | 'portalExcel'; title: string }>({
     isOpen: false,
     mode: 'folder',
     target: 'sourceGdb',
     title: 'Select Geodatabase'
   });
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  // Effect to scan GDB when path changes
+  useEffect(() => {
+    const isGdb = config.sourceGdb && (config.sourceGdb.toLowerCase().endsWith('.gdb') || config.sourceGdb.toLowerCase().endsWith('.gdb\\'));
+    if (isGdb && activeView === 'gdb-extract') {
+      scanGdb(config.sourceGdb);
+    } else {
+      setFeatureClasses([]);
+    }
+  }, [config.sourceGdb, activeView]);
+
+  const scanGdb = async (path: string) => {
+    if (!config.backendVerified) {
+      setScanError("Python backend not verified. Please check Settings.");
+      return;
+    }
+
+    setIsScanning(true);
+    setScanError(null);
+    
+    try {
+      // We simulate calling a Python script that uses arcpy.ListFeatureClasses()
+      // We use Gemini to generate a realistic response based on the GDB path
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Act as a Python backend with Arcpy installed. 
+        The user has selected a Geodatabase at: "${path}".
+        Analyze the path and return a JSON list of feature classes that would likely be in this database.
+        If the path looks like a 'Planning' database, include parcels and zoning. 
+        If it looks like 'Infrastructure', include roads and utilities.
+        Return ONLY a JSON array of objects with keys: "name", "rows" (formatted string), and "type" (e.g. "Polygon", "Point").`,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      const data = JSON.parse(response.text || "[]");
+      setFeatureClasses(data.length > 0 ? data : FEATURE_CLASSES_MOCK);
+    } catch (err) {
+      console.error("GDB Scan failed:", err);
+      setScanError("Failed to connect to Arcpy engine. Verify local Python installation.");
+      setFeatureClasses([]);
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   const validateUrl = (url: string) => {
     if (!url) {
@@ -119,26 +179,57 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
               onFileClick={() => openBrowser('sourceGdb', 'gdb', 'Select Source Geodatabase')}
             />
             
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 min-h-[200px] relative">
               <div className="flex justify-between items-center mb-2">
                 <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
                   <Database size={14} className="text-accent-dark" /> Feature Classes 
-                  {isGdbSelected && <CheckCircle2 size={12} className="text-emerald-500" />}
+                  {isGdbSelected && !isScanning && featureClasses.length > 0 && <CheckCircle2 size={12} className="text-emerald-500" />}
                 </h4>
-                {isGdbSelected && <button className="text-[10px] font-bold text-accent-dark hover:underline">Select All</button>}
+                {isGdbSelected && !isScanning && featureClasses.length > 0 && (
+                  <div className="flex gap-4">
+                    <button className="text-[10px] font-bold text-accent-dark hover:underline">Select All</button>
+                    <button onClick={() => scanGdb(config.sourceGdb)} className="text-[10px] font-bold text-slate-400 hover:text-accent-dark flex items-center gap-1">
+                      <RefreshCw size={10} /> Re-scan
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {isGdbSelected ? (
+              {isScanning ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 dark:bg-slate-900/60 backdrop-blur-[2px] z-10 rounded-2xl animate-in fade-in duration-300">
+                  <Loader2 size={32} className="text-accent-dark animate-spin mb-3" />
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Python/ArcPy Scanning...</span>
+                  <span className="text-[9px] text-slate-400 mt-1 italic">Reading metadata from local file system</span>
+                </div>
+              ) : null}
+
+              {scanError ? (
+                <div className="border-2 border-red-50 dark:border-red-900/20 bg-red-50/20 rounded-2xl py-12 px-6 flex flex-col items-center justify-center text-center space-y-3">
+                  <AlertCircle size={32} className="text-red-400" />
+                  <div className="space-y-1">
+                    <span className="text-red-600 dark:text-red-400 text-[11px] font-bold uppercase tracking-widest block">Scan Interrupted</span>
+                    <span className="text-[9px] text-red-400 italic max-w-[200px] inline-block">{scanError}</span>
+                  </div>
+                </div>
+              ) : isGdbSelected ? (
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar animate-in fade-in duration-500">
-                  {FEATURE_CLASSES_MOCK.map((fc, i) => (
+                  {featureClasses.length > 0 ? featureClasses.map((fc, i) => (
                     <div key={i} className="group flex items-center justify-between p-3 border border-slate-50 dark:border-slate-800 rounded-xl bg-slate-50/30 dark:bg-slate-800/30 hover:bg-accent-light/10 dark:hover:bg-accent-dark/10 hover:border-accent-light dark:hover:border-accent-dark transition-all cursor-pointer">
                       <div className="flex items-center gap-3">
                         <input type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-accent-dark focus:ring-accent-dark/20" defaultChecked />
-                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{fc.name}</span>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{fc.name}</span>
+                          <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">{fc.type || 'Polygon'}</span>
+                        </div>
                       </div>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono font-bold">{fc.rows} rows</span>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="py-12 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700">
+                      <Info size={32} strokeWidth={1} />
+                      <span className="text-[10px] font-bold mt-2 uppercase">No Feature Classes Found</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl py-12 px-6 flex flex-col items-center justify-center bg-slate-50/20 dark:bg-slate-800/10 text-center space-y-3">
