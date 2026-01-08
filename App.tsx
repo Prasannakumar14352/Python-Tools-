@@ -17,6 +17,7 @@ import {
   ArrowLeftRight,
   Globe,
   Clock,
+  FileOutput,
   Settings as SettingsIcon
 } from 'lucide-react';
 
@@ -76,6 +77,7 @@ const App: React.FC = () => {
 
   const getToolInfo = () => {
     switch(activeView) {
+      case 'sde-to-gdb': return { title: 'SDE to GDB Conversion', sub: 'Migrate entire SDE schema to a local File Geodatabase', icon: FileOutput };
       case 'gdb-extract': return { title: 'GDB Extraction', sub: 'Extract feature classes from a File Geodatabase to individual shapefiles', icon: Database };
       case 'sde-to-sde': return { title: 'SDE to SDE Conversion', sub: 'Migrate feature classes between Enterprise Geodatabases', icon: RefreshCw };
       case 'fc-comparison': return { title: 'Feature Class Comparison', sub: 'Compare schema, attributes, or spatial properties between datasets', icon: ArrowLeftRight };

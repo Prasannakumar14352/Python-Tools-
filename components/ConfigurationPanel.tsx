@@ -21,7 +21,9 @@ import {
   FileCode,
   Search,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  FileOutput,
+  Type
 } from 'lucide-react';
 
 interface FeatureClass {
@@ -52,15 +54,27 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  // Effect to scan GDB when path changes
+  // Scan Logic
+  const getRelevantPath = () => {
+    if (activeView === 'gdb-extract') return config.sourceGdb;
+    if (activeView === 'sde-to-gdb') return config.sdeToGdbSource;
+    return '';
+  };
+
   useEffect(() => {
-    const isGdb = config.sourceGdb && (config.sourceGdb.toLowerCase().endsWith('.gdb') || config.sourceGdb.toLowerCase().endsWith('.gdb\\'));
-    if (isGdb && activeView === 'gdb-extract') {
-      scanGdb(config.sourceGdb);
+    const path = getRelevantPath();
+    const isGisPath = path && (
+      path.toLowerCase().endsWith('.gdb') || 
+      path.toLowerCase().endsWith('.gdb\\') || 
+      path.toLowerCase().endsWith('.sde')
+    );
+    
+    if (isGisPath && (activeView === 'gdb-extract' || activeView === 'sde-to-gdb')) {
+      scanGdb(path);
     } else {
       setFeatureClasses([]);
     }
-  }, [config.sourceGdb, activeView]);
+  }, [config.sourceGdb, config.sdeToGdbSource, activeView]);
 
   const scanGdb = async (path: string) => {
     if (!config.backendVerified) {
@@ -72,16 +86,13 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
     setScanError(null);
     
     try {
-      // We simulate calling a Python script that uses arcpy.ListFeatureClasses()
-      // We use Gemini to generate a realistic response based on the GDB path
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Act as a Python backend with Arcpy installed. 
-        The user has selected a Geodatabase at: "${path}".
-        Analyze the path and return a JSON list of feature classes that would likely be in this database.
-        If the path looks like a 'Planning' database, include parcels and zoning. 
-        If it looks like 'Infrastructure', include roads and utilities.
-        Return ONLY a JSON array of objects with keys: "name", "rows" (formatted string), and "type" (e.g. "Polygon", "Point").`,
+        The user has selected a workspace at: "${path}".
+        Analyze the path and return a JSON list of feature classes, tables, and datasets that would likely be in this database.
+        Include metadata like rows (formatted string) and geometry type.
+        Return ONLY a JSON array of objects with keys: "name", "rows", and "type".`,
         config: {
           responseMimeType: "application/json"
         }
@@ -90,7 +101,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
       const data = JSON.parse(response.text || "[]");
       setFeatureClasses(data.length > 0 ? data : FEATURE_CLASSES_MOCK);
     } catch (err) {
-      console.error("GDB Scan failed:", err);
+      console.error("Workspace Scan failed:", err);
       setScanError("Failed to connect to Arcpy engine. Verify local Python installation.");
       setFeatureClasses([]);
     } finally {
@@ -165,6 +176,78 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
 
   const renderContent = () => {
     switch (activeView) {
+      case 'sde-to-gdb':
+        const isSdeSelected = config.sdeToGdbSource && (config.sdeToGdbSource.toLowerCase().endsWith('.sde') || config.sdeToGdbSource.toLowerCase().endsWith('.gdb'));
+        return (
+          <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar pb-4">
+            <InputField 
+              label="Source Workspace"
+              sub="Path to the source .sde connection or .gdb folder"
+              value={config.sdeToGdbSource}
+              icon={Database}
+              placeholder="C:\GIS\Data\source.sde"
+              onChange={(v: string) => onChange({ sdeToGdbSource: v })}
+              onFileClick={() => openBrowser('sdeToGdbSource', 'file', 'Select Source Workspace')}
+            />
+
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 min-h-[180px] relative">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest flex items-center gap-2">
+                  <RefreshCw size={14} className="text-accent-dark" /> Source Content Preview
+                  {isSdeSelected && !isScanning && <CheckCircle2 size={12} className="text-emerald-500" />}
+                </h4>
+              </div>
+              
+              {isScanning && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 dark:bg-slate-900/60 z-10 rounded-2xl">
+                  <Loader2 size={24} className="text-accent-dark animate-spin mb-2" />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">Scanning SDE...</span>
+                </div>
+              )}
+
+              {isSdeSelected ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                  {featureClasses.map((fc, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 border border-slate-50 dark:border-slate-800 rounded-lg bg-slate-50/30">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200">{fc.name}</span>
+                        <span className="text-[8px] text-slate-400 font-medium uppercase">{fc.type}</span>
+                      </div>
+                      <span className="text-[9px] text-slate-400 font-mono">{fc.rows} rows</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 opacity-40">
+                  <Database size={24} className="mb-2" />
+                  <span className="text-[10px] uppercase font-bold tracking-widest">Select Source to Preview Content</span>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField 
+                label="Target Folder"
+                sub="Where the GDB will be created"
+                value={config.sdeToGdbTargetFolder}
+                icon={FolderOpen}
+                placeholder="C:\GIS\Output"
+                onChange={(v: string) => onChange({ sdeToGdbTargetFolder: v })}
+                onFileClick={() => openBrowser('sdeToGdbTargetFolder', 'folder', 'Select Target Folder')}
+              />
+              <InputField 
+                label="Output GDB Name"
+                sub="Include .gdb extension"
+                value={config.sdeToGdbName}
+                icon={Type}
+                isFile={false}
+                placeholder="OutputData.gdb"
+                onChange={(v: string) => onChange({ sdeToGdbName: v })}
+              />
+            </div>
+          </div>
+        );
+
       case 'gdb-extract':
         const isGdbSelected = config.sourceGdb && (config.sourceGdb.toLowerCase().endsWith('.gdb') || config.sourceGdb.toLowerCase().endsWith('.gdb\\'));
         return (
@@ -185,59 +268,39 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
                   <Database size={14} className="text-accent-dark" /> Feature Classes 
                   {isGdbSelected && !isScanning && featureClasses.length > 0 && <CheckCircle2 size={12} className="text-emerald-500" />}
                 </h4>
-                {isGdbSelected && !isScanning && featureClasses.length > 0 && (
-                  <div className="flex gap-4">
-                    <button className="text-[10px] font-bold text-accent-dark hover:underline">Select All</button>
-                    <button onClick={() => scanGdb(config.sourceGdb)} className="text-[10px] font-bold text-slate-400 hover:text-accent-dark flex items-center gap-1">
-                      <RefreshCw size={10} /> Re-scan
-                    </button>
-                  </div>
-                )}
               </div>
 
               {isScanning ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 dark:bg-slate-900/60 backdrop-blur-[2px] z-10 rounded-2xl animate-in fade-in duration-300">
                   <Loader2 size={32} className="text-accent-dark animate-spin mb-3" />
                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Python/ArcPy Scanning...</span>
-                  <span className="text-[9px] text-slate-400 mt-1 italic">Reading metadata from local file system</span>
                 </div>
               ) : null}
 
               {scanError ? (
                 <div className="border-2 border-red-50 dark:border-red-900/20 bg-red-50/20 rounded-2xl py-12 px-6 flex flex-col items-center justify-center text-center space-y-3">
                   <AlertCircle size={32} className="text-red-400" />
-                  <div className="space-y-1">
-                    <span className="text-red-600 dark:text-red-400 text-[11px] font-bold uppercase tracking-widest block">Scan Interrupted</span>
-                    <span className="text-[9px] text-red-400 italic max-w-[200px] inline-block">{scanError}</span>
-                  </div>
+                  <span className="text-red-600 dark:text-red-400 text-[11px] font-bold uppercase tracking-widest block">Scan Interrupted</span>
                 </div>
               ) : isGdbSelected ? (
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar animate-in fade-in duration-500">
-                  {featureClasses.length > 0 ? featureClasses.map((fc, i) => (
-                    <div key={i} className="group flex items-center justify-between p-3 border border-slate-50 dark:border-slate-800 rounded-xl bg-slate-50/30 dark:bg-slate-800/30 hover:bg-accent-light/10 dark:hover:bg-accent-dark/10 hover:border-accent-light dark:hover:border-accent-dark transition-all cursor-pointer">
+                  {featureClasses.map((fc, i) => (
+                    <div key={i} className="group flex items-center justify-between p-3 border border-slate-50 dark:border-slate-800 rounded-xl bg-slate-50/30 dark:bg-slate-800/30 hover:bg-accent-light/10 transition-all cursor-pointer">
                       <div className="flex items-center gap-3">
                         <input type="checkbox" className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-accent-dark focus:ring-accent-dark/20" defaultChecked />
                         <div className="flex flex-col">
                           <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{fc.name}</span>
-                          <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">{fc.type || 'Polygon'}</span>
+                          <span className="text-[9px] text-slate-400 font-medium uppercase tracking-tighter">{fc.type}</span>
                         </div>
                       </div>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono font-bold">{fc.rows} rows</span>
                     </div>
-                  )) : (
-                    <div className="py-12 flex flex-col items-center justify-center text-slate-300 dark:text-slate-700">
-                      <Info size={32} strokeWidth={1} />
-                      <span className="text-[10px] font-bold mt-2 uppercase">No Feature Classes Found</span>
-                    </div>
-                  )}
+                  ))}
                 </div>
               ) : (
                 <div className="border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl py-12 px-6 flex flex-col items-center justify-center bg-slate-50/20 dark:bg-slate-800/10 text-center space-y-3">
                   <Database size={32} strokeWidth={1} className="text-slate-200 dark:text-slate-700" />
-                  <div className="space-y-1">
-                    <span className="text-slate-400 dark:text-slate-600 text-[11px] font-bold uppercase tracking-widest block">Select a geodatabase to view contents</span>
-                    <span className="text-[9px] text-slate-300 dark:text-slate-600 italic">Browsing allows picking folders as .gdb containers</span>
-                  </div>
+                  <span className="text-slate-400 dark:text-slate-600 text-[11px] font-bold uppercase tracking-widest block">Select a geodatabase to view contents</span>
                 </div>
               )}
             </div>
@@ -401,6 +464,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
 
   const getExecuteLabel = () => {
     switch(activeView) {
+      case 'sde-to-gdb': return 'Execute Migration';
       case 'gdb-extract': return 'Execute Extraction';
       case 'sde-to-sde': return 'Execute Migration';
       case 'fc-comparison': return 'Run Comparison';
@@ -412,7 +476,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
   return (
     <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-full flex flex-col relative overflow-hidden transition-colors">
       <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-8 tracking-tight">
-        {activeView === 'sde-to-sde' ? 'Database Migration' : (activeView === 'fc-comparison' ? 'Quality Comparison' : 'Tool Configuration')}
+        {activeView === 'sde-to-gdb' ? 'Data Migration' : (activeView === 'sde-to-sde' ? 'Database Migration' : (activeView === 'fc-comparison' ? 'Quality Comparison' : 'Tool Configuration'))}
       </h3>
 
       {renderContent()}
