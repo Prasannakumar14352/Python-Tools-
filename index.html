@@ -36,6 +36,9 @@
             overflow: hidden;
             background-color: #f1f5f9;
         }
+        .dark body {
+            background-color: #020617;
+        }
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -46,6 +49,9 @@
         ::-webkit-scrollbar-thumb {
             background: #cbd5e1;
             border-radius: 10px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
         }
         .console-scrollbar::-webkit-scrollbar-thumb {
             background: #334155;
@@ -62,7 +68,9 @@
 }
 </script>
 </head>
-<body class="text-slate-900">
+<body class="text-slate-900 transition-colors duration-300">
     <div id="root"></div>
+    <!-- This script tag is required for Vite to load your application -->
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>
