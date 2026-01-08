@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   LayoutDashboard, 
@@ -9,7 +8,7 @@ import {
   History, 
   Settings,
   ChevronLeft,
-  FileOutput
+  FileDown
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,7 +19,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', sub: 'Overview & quick actions', icon: LayoutDashboard },
-    { id: 'sde-to-gdb', label: 'SDE to GDB', sub: 'Convert SDE to File GDB', icon: FileOutput },
+    { id: 'sde-to-gdb', label: 'SDE to GDB', sub: 'Enterprise to File GDB', icon: FileDown },
     { id: 'gdb-extract', label: 'GDB Extraction', sub: 'Extract from Geodatabase', icon: Database },
     { id: 'sde-to-sde', label: 'SDE to SDE', sub: 'Migrate feature classes', icon: RefreshCw },
     { id: 'fc-comparison', label: 'FC Comparison', sub: 'Compare datasets', icon: ArrowLeftRight },

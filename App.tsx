@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Console from './components/Console';
@@ -17,9 +16,10 @@ import {
   ArrowLeftRight,
   Globe,
   Clock,
-  FileOutput,
+  FileDown,
   Settings as SettingsIcon,
-  History
+  History,
+  LayoutDashboard
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -59,27 +59,31 @@ const App: React.FC = () => {
     addLog({ timestamp: new Date().toLocaleTimeString(), level: 'SYSTEM', message: `Initialising ${activeView.toUpperCase()} operation...` });
 
     const dummyScript = { id: activeView, name: activeView, description: '', icon: '', status: ExecutionStatus.IDLE };
-    const success = await simulateScriptRun(dummyScript, config, addLog, () => {});
-
-    if (success) {
-      addLog({ timestamp: new Date().toLocaleTimeString(), level: 'SUCCESS', message: 'Task completed successfully.' });
-    } else {
-      addLog({ timestamp: new Date().toLocaleTimeString(), level: 'ERROR', message: 'Operation failed. Check local Python logs.' });
+    try {
+      const success = await simulateScriptRun(dummyScript, config, addLog, () => {});
+      if (success) {
+        addLog({ timestamp: new Date().toLocaleTimeString(), level: 'SUCCESS', message: 'Task completed successfully.' });
+      } else {
+        addLog({ timestamp: new Date().toLocaleTimeString(), level: 'ERROR', message: 'Operation failed. Check local Python logs.' });
+      }
+    } catch (err) {
+      addLog({ timestamp: new Date().toLocaleTimeString(), level: 'ERROR', message: `Execution Error: ${err.message}` });
+    } finally {
+      setIsExecuting(false);
     }
-    setIsExecuting(false);
   };
 
   const getToolInfo = () => {
     switch(activeView) {
-      case 'dashboard': return { title: 'Dashboard', sub: 'Project Overview', icon: Database };
-      case 'sde-to-gdb': return { title: 'SDE to GDB', sub: 'Enterprise to File GDB Migration', icon: FileOutput };
+      case 'dashboard': return { title: 'Dashboard', sub: 'Project Overview', icon: LayoutDashboard };
+      case 'sde-to-gdb': return { title: 'SDE to GDB', sub: 'Enterprise to File GDB Migration', icon: FileDown };
       case 'gdb-extract': return { title: 'GDB Extraction', sub: 'Feature Class Export', icon: Database };
       case 'sde-to-sde': return { title: 'SDE to SDE', sub: 'Database to Database Sync', icon: RefreshCw };
       case 'fc-comparison': return { title: 'Comparison', sub: 'Dataset Analysis Tool', icon: ArrowLeftRight };
       case 'portal-extract': return { title: 'Portal Extraction', sub: 'AGOL Content Inventory', icon: Globe };
       case 'job-history': return { title: 'History', sub: 'Task execution records', icon: History };
       case 'settings': return { title: 'Settings', sub: 'Application Preferences', icon: SettingsIcon };
-      default: return null;
+      default: return { title: 'Tool', sub: 'GIS Automation', icon: Database };
     }
   };
 

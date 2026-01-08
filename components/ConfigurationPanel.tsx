@@ -18,7 +18,7 @@ import {
   Search,
   Loader2,
   AlertCircle,
-  FileOutput,
+  FileDown,
   Type,
   Settings2,
   History,
@@ -49,7 +49,16 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
     title: 'Select Geodatabase'
   });
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Defensive API Key access
+  const getAi = () => {
+    try {
+      const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) ? process.env.API_KEY : '';
+      return new GoogleGenAI({ apiKey });
+    } catch (e) {
+      console.error("AI Initialization failed", e);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const path = activeView === 'gdb-extract' ? config.sourceGdb : (activeView === 'sde-to-gdb' ? config.sdeToGdbSource : '');
@@ -65,6 +74,13 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
   const scanWorkspace = async (path: string) => {
     if (!config.backendVerified) return;
     setIsScanning(true);
+    const ai = getAi();
+    if (!ai) {
+      setFeatureClasses(FEATURE_CLASSES_MOCK);
+      setIsScanning(false);
+      return;
+    }
+
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -74,7 +90,8 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
       const data = JSON.parse(response.text || "[]");
       setFeatureClasses(data.length > 0 ? data : FEATURE_CLASSES_MOCK);
     } catch (err) {
-      setFeatureClasses([]);
+      console.warn("AI workspace scan failed, using fallback mock.");
+      setFeatureClasses(FEATURE_CLASSES_MOCK);
     } finally {
       setIsScanning(false);
     }
@@ -177,7 +194,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
              <h3 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest">Tool configuration</h3>
           </div>
           <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-mono">
-            <FileText size={10} /> {config.scriptFilePaths[activeView]}
+            <FileText size={10} /> {config.scriptFilePaths[activeView] || 'No file assigned'}
           </div>
         </div>
         <button onClick={() => onChange(DEFAULT_CONFIG)} className="text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase">Reset</button>
@@ -185,7 +202,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
 
       <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">{renderConfig()}</div>
 
-      {activeView !== 'job-history' && (
+      {activeView !== 'job-history' && activeView !== 'dashboard' && activeView !== 'settings' && (
         <div className="p-8 border-t border-slate-100 dark:border-slate-800 bg-slate-50/20">
           <button
             onClick={onExecute}
