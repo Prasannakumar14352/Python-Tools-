@@ -19,7 +19,8 @@ import {
   FileDown,
   Settings as SettingsIcon,
   History,
-  LayoutDashboard
+  LayoutDashboard,
+  Terminal
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -83,49 +84,61 @@ const App: React.FC = () => {
       case 'portal-extract': return { title: 'Portal Extraction', sub: 'AGOL Content Inventory', icon: Globe };
       case 'job-history': return { title: 'History', sub: 'Task execution records', icon: History };
       case 'settings': return { title: 'Settings', sub: 'Application Preferences', icon: SettingsIcon };
-      default: return { title: 'Tool', sub: 'GIS Automation', icon: Database };
+      default: return { title: 'Tool', sub: 'GIS Automation', icon: Terminal };
     }
   };
 
   const toolInfo = getToolInfo();
-  const Icon = toolInfo?.icon;
+  const Icon = toolInfo?.icon || Terminal;
 
   const renderContent = () => {
-    if (activeView === 'dashboard') {
+    try {
+      if (activeView === 'dashboard') {
+        return (
+          <div className="flex-1 overflow-y-auto pr-4 -mr-4 custom-scrollbar pb-8">
+            <DashboardView config={config} onQuickAction={setActiveView} />
+          </div>
+        );
+      }
+
+      if (activeView === 'settings') {
+        return (
+          <div className="flex-1 overflow-y-auto pr-4 -mr-4 custom-scrollbar pb-8">
+            <SettingsView config={config} onChange={(u) => setConfig(p => ({ ...p, ...u }))} />
+          </div>
+        );
+      }
+
       return (
-        <div className="flex-1 overflow-y-auto pr-4 -mr-4 custom-scrollbar pb-8">
-          <DashboardView config={config} onQuickAction={setActiveView} />
+        <div className="flex-1 flex gap-8 min-h-0 animate-in fade-in slide-in-from-right-4 duration-500">
+          <div className="w-[50%] lg:w-[55%] h-full flex flex-col overflow-hidden">
+            <ConfigurationPanel 
+              activeView={activeView}
+              config={config}
+              onChange={(u) => setConfig(p => ({ ...p, ...u }))}
+              isExecuting={isExecuting}
+              onExecute={() => setShowConfirm(true)}
+            />
+          </div>
+          <div className="flex-1 h-full">
+            <Console 
+              logs={logs} 
+              onClear={() => setLogs([])} 
+            />
+          </div>
+        </div>
+      );
+    } catch (err) {
+      console.error("Render error in App content area", err);
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-12 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
+           <AlertTriangle size={64} className="mb-4 text-red-500 opacity-20" />
+           <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Interface Error</h3>
+           <p className="text-sm">Something went wrong while rendering this tool. Please try selecting another option.</p>
+           <button onClick={() => setActiveView('dashboard')} className="mt-6 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold uppercase tracking-widest">Return to Dashboard</button>
         </div>
       );
     }
-
-    if (activeView === 'settings') {
-      return (
-        <div className="flex-1 overflow-y-auto pr-4 -mr-4 custom-scrollbar pb-8">
-          <SettingsView config={config} onChange={(u) => setConfig(p => ({ ...p, ...u }))} />
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex-1 flex gap-8 min-h-0 animate-in fade-in slide-in-from-right-4 duration-500">
-        <div className="w-[50%] lg:w-[55%] h-full flex flex-col overflow-hidden">
-          <ConfigurationPanel 
-            activeView={activeView}
-            config={config}
-            onChange={(u) => setConfig(p => ({ ...p, ...u }))}
-            isExecuting={isExecuting}
-            onExecute={() => setShowConfirm(true)}
-          />
-        </div>
-        <div className="flex-1 h-full">
-          <Console 
-            logs={logs} 
-            onClear={() => setLogs([])} 
-          />
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -137,7 +150,7 @@ const App: React.FC = () => {
           <header className="flex items-center justify-between mb-8 shrink-0">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-accent-light/20 text-accent-dark rounded-2xl flex items-center justify-center shadow-sm">
-                {Icon && <Icon size={24} />}
+                <Icon size={24} />
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">{toolInfo?.title}</h2>

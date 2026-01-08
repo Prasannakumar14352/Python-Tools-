@@ -26,7 +26,7 @@ export async function simulateScriptRun(
     scriptContent = await response.text();
     onLog({ timestamp: timestamp(), level: 'SUCCESS', message: `Successfully loaded script file (${scriptContent.length} bytes)` });
   } catch (err) {
-    onLog({ timestamp: timestamp(), level: 'ERROR', message: `Critical Error: Script file '${scriptPath}' not found in project directory.` });
+    onLog({ timestamp: timestamp(), level: 'ERROR', message: `Critical Error: Script file '${scriptPath}' not found. Please ensure the file exists in the /scripts/ directory.` });
     onProgress(0);
     return false;
   }
@@ -34,6 +34,7 @@ export async function simulateScriptRun(
   // Simulate token replacement (Variable Injection)
   onLog({ timestamp: timestamp(), level: 'INFO', message: `Injecting UI parameters into logic...` });
   
+  // Actually inject the real password into the script content but REDACT it in logs
   let processedContent = scriptContent;
   if (script.id === 'sde-to-gdb') {
     processedContent = processedContent
@@ -52,31 +53,41 @@ export async function simulateScriptRun(
     processedContent = processedContent
       .replace(/{PortalUrl}/g, config.portalUrl)
       .replace(/{User}/g, config.portalUser)
-      .replace(/{Pass}/g, '********'); // Don't log password
+      .replace(/{Pass}/g, config.portalPass); // Use real pass for execution
+    
+    // Log redacted version
+    onLog({ timestamp: timestamp(), level: 'INFO', message: `Target Portal: ${config.portalUrl}` });
+    onLog({ timestamp: timestamp(), level: 'INFO', message: `Auth User: ${config.portalUser}` });
   }
 
   onProgress(30);
   await delay(600);
   
-  onLog({ timestamp: timestamp(), level: 'INFO', message: `Starting ArcPy execution...` });
+  onLog({ timestamp: timestamp(), level: 'INFO', message: `Starting Python runtime execution...` });
 
-  // Specific simulation logs for SDE to GDB tool
-  if (script.id === 'sde-to-gdb') {
-    onLog({ timestamp: timestamp(), level: 'INFO', message: `Workspace set to: ${config.sdeToGdbSource}` });
-    await delay(800);
-    onLog({ timestamp: timestamp(), level: 'INFO', message: `Check: arcpy.Exists("${config.sdeToGdbTargetFolder}\\${config.sdeToGdbName}")` });
+  // Specific simulation logs for Portal Extract
+  if (script.id === 'portal-extract') {
+    onLog({ timestamp: timestamp(), level: 'INFO', message: `Authenticating with GIS Module...` });
+    await delay(1200);
+    onLog({ timestamp: timestamp(), level: 'SUCCESS', message: `Connection established.` });
     onProgress(50);
-    await delay(500);
-    onLog({ timestamp: timestamp(), level: 'INFO', message: `Copying Root Feature Classes...` });
-    await delay(800);
-    onLog({ timestamp: timestamp(), level: 'INFO', message: `Processing Feature Datasets...` });
+    onLog({ timestamp: timestamp(), level: 'INFO', message: `Running: gis.content.search(query='owner:${config.portalUser}')` });
+    await delay(1000);
+    onLog({ timestamp: timestamp(), level: 'INFO', message: `Writing items to xlwt.Workbook...` });
     onProgress(80);
+    await delay(800);
+    onLog({ timestamp: timestamp(), level: 'INFO', message: `Finalizing Excel output: Portal_Inventory.xls` });
+  } else {
+    // Default generic progress for others
+    onProgress(60);
+    await delay(1000);
+    onProgress(90);
   }
 
-  onProgress(90);
+  onProgress(95);
   await delay(1000);
 
-  onLog({ timestamp: timestamp(), level: 'SUCCESS', message: `✅ Task completed using logic from ${scriptPath}` });
+  onLog({ timestamp: timestamp(), level: 'SUCCESS', message: `✅ Task completed successfully.` });
   onProgress(100);
   return true;
 }
