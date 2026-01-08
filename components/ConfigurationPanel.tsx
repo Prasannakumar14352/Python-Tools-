@@ -22,7 +22,8 @@ import {
   Type,
   Settings2,
   History,
-  FileText
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface FeatureClass {
@@ -42,20 +43,18 @@ interface ConfigurationPanelProps {
 const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, config, onChange, isExecuting, onExecute }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [featureClasses, setFeatureClasses] = useState<FeatureClass[]>([]);
-  const [browserMode, setBrowserMode] = useState<{ isOpen: boolean; mode: 'file' | 'folder' | 'gdb'; target: keyof AppConfig | 'portalExcel'; title: string }>({
+  const [browserMode, setBrowserMode] = useState<{ isOpen: boolean; mode: 'file' | 'folder' | 'gdb'; target: keyof AppConfig; title: string }>({
     isOpen: false,
     mode: 'folder',
     target: 'sourceGdb',
     title: 'Select Geodatabase'
   });
 
-  // Defensive API Key access
   const getAi = () => {
     try {
       const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) ? process.env.API_KEY : '';
       return new GoogleGenAI({ apiKey });
     } catch (e) {
-      console.error("AI Initialization failed", e);
       return null;
     }
   };
@@ -90,14 +89,13 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
       const data = JSON.parse(response.text || "[]");
       setFeatureClasses(data.length > 0 ? data : FEATURE_CLASSES_MOCK);
     } catch (err) {
-      console.warn("AI workspace scan failed, using fallback mock.");
       setFeatureClasses(FEATURE_CLASSES_MOCK);
     } finally {
       setIsScanning(false);
     }
   };
 
-  const InputField = ({ label, value, icon: Icon, onChange: onValChange, isFile = true, onFileClick, placeholder }: any) => (
+  const InputField = ({ label, value, icon: Icon, onChange: onValChange, isFile = true, onFileClick, placeholder, type = "text" }: any) => (
     <div className="space-y-2 animate-in fade-in duration-300">
       <label className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">{label}</label>
       <div className="flex gap-2">
@@ -105,7 +103,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><Icon size={14} /></span>
           <input
             disabled={isExecuting}
-            type="text"
+            type={type}
             value={value}
             onChange={(e) => onValChange(e.target.value)}
             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-600 dark:text-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-accent-dark/20 transition-all shadow-inner"
@@ -113,7 +111,7 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
           />
         </div>
         {isFile && (
-          <button onClick={onFileClick} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 rounded-lg text-slate-400 hover:bg-slate-50 transition-colors">
+          <button onClick={onFileClick} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 rounded-lg text-slate-400 hover:bg-slate-50 transition-colors shadow-sm active:scale-95">
             <Search size={14} />
           </button>
         )}
@@ -170,11 +168,43 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
         );
       case 'portal-extract':
         return (
-          <div className="space-y-6">
-            <InputField label="Portal URL" value={config.portalUrl} icon={Globe} onChange={(v: string) => onChange({ portalUrl: v })} isFile={false} />
+          <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-500">
+            <InputField 
+              label="Portal URL" 
+              value={config.portalUrl} 
+              icon={Globe} 
+              onChange={(v: string) => onChange({ portalUrl: v })} 
+              isFile={false} 
+              placeholder="https://www.arcgis.com" 
+            />
             <div className="grid grid-cols-2 gap-4">
-              <InputField label="User" value={config.portalUser} icon={User} onChange={(v: string) => onChange({ portalUser: v })} isFile={false} />
-              <InputField label="Password" value={config.portalPass} icon={Lock} onChange={(v: string) => onChange({ portalPass: v })} isFile={false} />
+              <InputField 
+                label="User" 
+                value={config.portalUser} 
+                icon={User} 
+                onChange={(v: string) => onChange({ portalUser: v })} 
+                isFile={false} 
+                placeholder="spkumar14352" 
+              />
+              <InputField 
+                label="Password" 
+                value={config.portalPass} 
+                icon={Lock} 
+                onChange={(v: string) => onChange({ portalPass: v })} 
+                isFile={false} 
+                type="password" 
+                placeholder="••••••••" 
+              />
+            </div>
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+              <InputField 
+                label="Excel Output Path" 
+                value={config.portalOutputPath} 
+                icon={FileSpreadsheet} 
+                onChange={(v: string) => onChange({ portalOutputPath: v })} 
+                onFileClick={() => setBrowserMode({ isOpen: true, mode: 'folder', target: 'portalOutputPath', title: 'Select Output Directory' })} 
+                placeholder="C:\GIS\Reports\Portal_Inventory.xls"
+              />
             </div>
           </div>
         );
@@ -186,12 +216,12 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-full flex flex-col overflow-hidden">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm h-full flex flex-col overflow-hidden transition-all duration-300">
       <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-8 py-6">
         <div className="flex flex-col">
           <div className="flex items-center gap-2 mb-1">
              <Settings2 size={16} className="text-accent-dark" />
-             <h3 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest">Tool configuration</h3>
+             <h3 className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest leading-none">Tool configuration</h3>
           </div>
           <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-mono">
             <FileText size={10} /> {config.scriptFilePaths[activeView] || 'No file assigned'}
@@ -215,7 +245,19 @@ const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ activeView, con
         </div>
       )}
 
-      <FileBrowserModal isOpen={browserMode.isOpen} mode={browserMode.mode} title={browserMode.title} onClose={() => setBrowserMode(p => ({ ...p, isOpen: false }))} onSelect={(p) => onChange({ [browserMode.target as keyof AppConfig]: p })} />
+      <FileBrowserModal 
+        isOpen={browserMode.isOpen} 
+        mode={browserMode.mode} 
+        title={browserMode.title} 
+        onClose={() => setBrowserMode(p => ({ ...p, isOpen: false }))} 
+        onSelect={(p) => {
+          let finalPath = p;
+          if (browserMode.target === 'portalOutputPath' && !p.toLowerCase().endsWith('.xls')) {
+            finalPath = p.endsWith('\\') ? `${p}Portal_Inventory.xls` : `${p}\\Portal_Inventory.xls`;
+          }
+          onChange({ [browserMode.target]: finalPath });
+        }} 
+      />
     </div>
   );
 };

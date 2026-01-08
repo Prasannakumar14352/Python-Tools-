@@ -1,3 +1,4 @@
+
 export enum ExecutionStatus {
   IDLE = 'IDLE',
   RUNNING = 'RUNNING',
@@ -36,6 +37,7 @@ export interface AppConfig {
   portalUrl: string;
   portalUser: string;
   portalPass: string;
+  portalOutputPath: string;
   comparisonType: 'schema' | 'attribute' | 'spatial';
   verboseLogging: boolean;
   dryRun: boolean;

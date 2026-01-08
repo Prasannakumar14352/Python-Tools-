@@ -1,3 +1,4 @@
+
 import { AppConfig } from './types';
 
 export const SCRIPT_FILE_PATHS: Record<string, string> = {
@@ -9,7 +10,7 @@ export const SCRIPT_FILE_PATHS: Record<string, string> = {
 };
 
 export const DEFAULT_CONFIG: AppConfig = {
-  interpreterPath: '',
+  interpreterPath: 'C:\\Program Files\\ArcGIS\\Pro\\bin\\Python\\envs\\arcgispro-py3\\python.exe',
   backendVerified: false,
   sourceGdb: 'C:\\Data\\MyDatabase.gdb',
   sdeConnection: 'C:\\Connections\\Prod.sde',
@@ -20,6 +21,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   portalUrl: 'https://www.arcgis.com',
   portalUser: '',
   portalPass: '',
+  portalOutputPath: 'C:\\GIS\\Reports\\Portal_Inventory.xls',
   comparisonType: 'schema',
   verboseLogging: true,
   dryRun: false,
